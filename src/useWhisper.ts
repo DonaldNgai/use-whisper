@@ -164,7 +164,6 @@ export const useWhisper: UseWhisperHook = (config) => {
    * - update recording state to true
    */
   const onStartRecording = async () => {
-    console.log('I am printing now')
     try {
       if (!stream.current) {
         await onStartStreaming()
@@ -181,8 +180,7 @@ export const useWhisper: UseWhisperHook = (config) => {
             sampleRate: 44100, // Sample rate = 44.1khz
             timeSlice: streaming ? timeSlice : undefined,
             type: 'audio',
-            ondataavailable:
-              autoTranscribe && streaming ? onDataAvailable : undefined,
+            ondataavailable: streaming ? onDataAvailable : undefined,
           }
           recorder.current = new RecordRTCPromisesHandler(
             stream.current,
@@ -312,13 +310,18 @@ export const useWhisper: UseWhisperHook = (config) => {
         onStopStreaming()
         onStopTimeout('stop')
         setRecording(false)
+
         if (autoTranscribe) {
           await onTranscribing()
         } else {
           const blob = await recorder.current.getBlob()
-          setTranscript({
-            blob,
-          })
+          if (streaming) {
+            await onDataAvailable(blob)
+          } else {
+            setTranscript({
+              blob,
+            })
+          }
         }
         await recorder.current.destroy()
         chunks.current = []
@@ -462,24 +465,26 @@ export const useWhisper: UseWhisperHook = (config) => {
     try {
       if (streaming && recorder.current) {
         onDataAvailableCallback?.(data)
-        if (encoder.current) {
-          const buffer = await data.arrayBuffer()
-          const mp3chunk = encoder.current.encodeBuffer(new Int16Array(buffer))
-          const mp3blob = new Blob([mp3chunk], { type: 'audio/mpeg' })
-          chunks.current.push(mp3blob)
-        }
-        const recorderState = await recorder.current.getState()
-        if (recorderState === 'recording') {
-          const blob = new Blob(chunks.current, {
-            type: 'audio/mpeg',
-          })
-          const file = new File([blob], 'speech.mp3', {
-            type: 'audio/mpeg',
-          })
-          const text = await onWhispered(file)
-          console.log('onInterim', { text })
-          if (text) {
-            setTranscript((prev) => ({ ...prev, text }))
+        if (autoTranscribe) {
+          if (encoder.current) {
+            const buffer = await data.arrayBuffer()
+            const mp3chunk = encoder.current.encodeBuffer(new Int16Array(buffer))
+            const mp3blob = new Blob([mp3chunk], { type: 'audio/mpeg' })
+            chunks.current.push(mp3blob)
+          }
+          const recorderState = await recorder.current.getState()
+          if (recorderState === 'recording') {
+            const blob = new Blob(chunks.current, {
+              type: 'audio/mpeg',
+            })
+            const file = new File([blob], 'speech.mp3', {
+              type: 'audio/mpeg',
+            })
+            const text = await onWhispered(file)
+            console.log('onInterim', { text })
+            if (text) {
+              setTranscript((prev) => ({ ...prev, text }))
+            }
           }
         }
       }
