@@ -164,6 +164,7 @@ export const useWhisper: UseWhisperHook = (config) => {
    * - update recording state to true
    */
   const onStartRecording = async () => {
+    console.log('I am printing now')
     try {
       if (!stream.current) {
         await onStartStreaming()
