@@ -387,50 +387,23 @@ export const useWhisper: UseWhisperHook = (config) => {
           setTranscribing(true)
           let blob = await recorder.current.getBlob()
           if (removeSilence) {
-            const { createFFmpeg } = await import('@ffmpeg/ffmpeg')
-            const ffmpeg = createFFmpeg({
-              mainName: 'main',
-              corePath: ffmpegCoreUrl,
-              log: true,
-            })
-            if (!ffmpeg.isLoaded()) {
-              await ffmpeg.load()
-            }
-            const buffer = await blob.arrayBuffer()
-            console.log({ in: buffer.byteLength })
-            ffmpeg.FS('writeFile', 'in.wav', new Uint8Array(buffer))
-            await ffmpeg.run(
-              '-i', // Input
-              'in.wav',
-              '-acodec', // Audio codec
-              'libmp3lame',
-              '-b:a', // Audio bitrate
-              '96k',
-              '-ar', // Audio sample rate
-              '44100',
-              '-af', // Audio filter = remove silence from start to end with 2 seconds in between
-              silenceRemoveCommand,
-              'out.mp3' // Output
-            )
-            const out = ffmpeg.FS('readFile', 'out.mp3')
-            console.log({ out: out.buffer.byteLength })
-            // 225 seems to be empty mp3 file
-            if (out.length <= 225) {
-              ffmpeg.exit()
+            blob = await removeSilenceFromBlob(blob)
+            console.log(`Silenced audio file size: ${blob.size}`)
+            if (blob.size < 255) {
+              // empty blob
+              console.log('Silenced audio file is empty')
               setTranscript({
                 blob,
               })
               setTranscribing(false)
               return
             }
-            blob = new Blob([out.buffer], { type: 'audio/mpeg' })
-            ffmpeg.exit()
           } else {
             const buffer = await blob.arrayBuffer()
-            console.log({ wav: buffer.byteLength })
+            console.log('wave buffer bytelength', { wav: buffer.byteLength })
             const mp3 = encoder.current.encodeBuffer(new Int16Array(buffer))
             blob = new Blob([mp3], { type: 'audio/mpeg' })
-            console.log({ blob, mp3: mp3.byteLength })
+            console.log('mp3 blob bytelength', { blob, mp3: mp3.byteLength })
           }
           if (typeof onTranscribeCallback === 'function') {
             const transcribed = await onTranscribeCallback(blob)
@@ -464,14 +437,29 @@ export const useWhisper: UseWhisperHook = (config) => {
     console.log('onDataAvailable', data)
     try {
       if (streaming && recorder.current) {
-        onDataAvailableCallback?.(data)
-        if (autoTranscribe) {
-          if (encoder.current) {
+        if (encoder.current) {
+          if (removeSilence) {
+            const silencedBlob = await removeSilenceFromBlob(data)
+            console.log(`Silenced audio file size: ${silencedBlob.size}`)
+            if (silencedBlob.size < 255) {
+              // empty blob
+              console.log('Silenced audio file is empty')
+
+              // Need to set transcript? Whole library is kinda funky
+              setTranscribing(false)
+              return
+            }
+            chunks.current.push(silencedBlob)
+          } else {
             const buffer = await data.arrayBuffer()
-            const mp3chunk = encoder.current.encodeBuffer(new Int16Array(buffer))
+            const mp3chunk = encoder.current.encodeBuffer(
+              new Int16Array(buffer)
+            )
             const mp3blob = new Blob([mp3chunk], { type: 'audio/mpeg' })
             chunks.current.push(mp3blob)
           }
+        }
+        if (autoTranscribe) {
           const recorderState = await recorder.current.getState()
           if (recorderState === 'recording') {
             const blob = new Blob(chunks.current, {
@@ -487,10 +475,48 @@ export const useWhisper: UseWhisperHook = (config) => {
             }
           }
         }
+        onDataAvailableCallback?.(data)
       }
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const removeSilenceFromBlob = async (dataBlob: Blob) => {
+    const { createFFmpeg } = await import('@ffmpeg/ffmpeg')
+    const ffmpeg = createFFmpeg({
+      mainName: 'main',
+      corePath: ffmpegCoreUrl,
+      log: true,
+    })
+    if (!ffmpeg.isLoaded()) {
+      await ffmpeg.load()
+    }
+    const buffer = await dataBlob.arrayBuffer()
+    console.log('inbuffer byte length: ', { in: buffer.byteLength })
+    ffmpeg.FS('writeFile', 'in.wav', new Uint8Array(buffer))
+    await ffmpeg.run(
+      '-i', // Input
+      'in.wav',
+      '-acodec', // Audio codec
+      'libmp3lame',
+      '-b:a', // Audio bitrate
+      '96k',
+      '-ar', // Audio sample rate
+      '44100',
+      '-af', // Audio filter = remove silence from start to end with 2 seconds in between
+      silenceRemoveCommand,
+      'out.mp3' // Output
+    )
+    const out = ffmpeg.FS('readFile', 'out.mp3')
+    console.log('outbuffer byte length: ', { out: out.buffer.byteLength })
+    // 225 seems to be empty mp3 file
+    // if (out.length <= 225) {
+    //   ffmpeg.exit()
+
+    // }
+    ffmpeg.exit()
+    return new Blob([out.buffer], { type: 'audio/mpeg' })
   }
 
   /**
