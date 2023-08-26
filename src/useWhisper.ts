@@ -16,6 +16,7 @@ import {
   UseWhisperTimeout,
   UseWhisperTranscript,
 } from './types'
+import { createFFmpeg } from '@ffmpeg/ffmpeg'
 
 /**
  * default useWhisper configuration
@@ -32,6 +33,7 @@ const defaultConfig: UseWhisperConfig = {
   timeSlice: 1_000,
   onDataAvailable: undefined,
   onTranscribe: undefined,
+  logSubModules: false,
 }
 
 /**
@@ -66,6 +68,7 @@ export const useWhisper: UseWhisperHook = (config) => {
     whisperConfig,
     onDataAvailable: onDataAvailableCallback,
     onTranscribe: onTranscribeCallback,
+    logSubModules,
   } = {
     ...defaultConfig,
     ...config,
@@ -180,6 +183,7 @@ export const useWhisper: UseWhisperHook = (config) => {
             sampleRate: 44100, // Sample rate = 44.1khz
             timeSlice: streaming ? timeSlice : undefined,
             type: 'audio',
+            disableLogs: !logSubModules,
             ondataavailable: streaming ? onDataAvailable : undefined,
           }
           recorder.current = new RecordRTCPromisesHandler(
@@ -484,11 +488,10 @@ export const useWhisper: UseWhisperHook = (config) => {
   }
 
   const removeSilenceFromBlob = async (dataBlob: Blob) => {
-    const { createFFmpeg } = await import('@ffmpeg/ffmpeg')
     const ffmpeg = createFFmpeg({
       mainName: 'main',
       corePath: ffmpegCoreUrl,
-      log: true,
+      log: logSubModules,
     })
     if (!ffmpeg.isLoaded()) {
       await ffmpeg.load()
