@@ -393,7 +393,7 @@ export const useWhisper: UseWhisperHook = (config) => {
           if (removeSilence) {
             blob = await removeSilenceFromBlob(blob)
             console.log(`Silenced audio file size: ${blob.size}`)
-            if (blob.size < 255) {
+            if (blob.size <= 358) {
               // empty blob
               console.log('Silenced audio file is empty')
               setTranscript({
@@ -445,7 +445,7 @@ export const useWhisper: UseWhisperHook = (config) => {
           if (removeSilence) {
             const silencedBlob = await removeSilenceFromBlob(data)
             console.log(`Silenced audio file size: ${silencedBlob.size}`)
-            if (silencedBlob.size < 255) {
+            if (silencedBlob.size <= 358) {
               // empty blob
               console.log('Silenced audio file is empty')
 
