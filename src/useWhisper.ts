@@ -450,6 +450,7 @@ export const useWhisper: UseWhisperHook = (config) => {
               return
             }
             chunks.current.push(silencedBlob)
+            data = silencedBlob
           } else {
             const buffer = await data.arrayBuffer()
             const mp3chunk = encoder.current.encodeBuffer(
@@ -510,6 +511,7 @@ export const useWhisper: UseWhisperHook = (config) => {
     )
     const out = ffmpeg.FS('readFile', 'out.mp3')
     console.log('outbuffer byte length: ', { out: out.buffer.byteLength })
+    console.log('out length: ', { out: out.length })
     // 225 seems to be empty mp3 file
     // if (out.length <= 225) {
     //   ffmpeg.exit()
