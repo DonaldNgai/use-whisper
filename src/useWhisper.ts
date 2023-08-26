@@ -392,7 +392,6 @@ export const useWhisper: UseWhisperHook = (config) => {
           let blob = await recorder.current.getBlob()
           if (removeSilence) {
             blob = await removeSilenceFromBlob(blob)
-            console.log(`Silenced audio file size: ${blob.size}`)
             if (blob.size <= 358) {
               // empty blob
               console.log('Silenced audio file is empty')
@@ -444,7 +443,6 @@ export const useWhisper: UseWhisperHook = (config) => {
         if (encoder.current) {
           if (removeSilence) {
             const silencedBlob = await removeSilenceFromBlob(data)
-            console.log(`Silenced audio file size: ${silencedBlob.size}`)
             if (silencedBlob.size <= 358) {
               // empty blob
               console.log('Silenced audio file is empty')
